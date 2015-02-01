@@ -1,0 +1,64 @@
+<Plugin
+    DescriptorVersion="1.0"
+    Name="UPnP Renderer"
+    PluginId="6E9B1302-9B93-4059-A53B-33A6B6A515BF"
+    Author="FreakyJ"
+    Copyright="GPL"
+    AutoActivate="true"
+    Description="UPnP Renderer"
+    PluginVersion="0.1">
+
+  <DependsOn>
+    <PluginReference PluginId="{D87D92F0-5E71-470a-A2A4-430F90A28BF3}"/>
+    <!-- SkinEngine -->
+    <PluginReference PluginId="{A965AFE5-44F9-46e0-980E-40BBE17F25CA}"/>
+    <!-- VideoPlayers -->
+    <PluginReference PluginId="{15FB35F7-8C85-4404-BC67-BFF28446158A}"/>
+    <!-- Media -->
+    <PluginReference PluginId="{1AFF4467-64B0-4ca1-AF28-9AEDF3525BCE}"/>
+    <!-- ConfigurationManager -->
+    <PluginReference PluginId="{B765A4B6-F455-4941-BDAE-2CE45208BFEB}"/>
+    <!-- Configuration plugin -->
+  </DependsOn>
+  
+  <Runtime>
+    <Assembly FileName="UPnPRenderer.dll"/>
+    <PluginStateTracker ClassName="MediaPortal.Extensions.UPnPRenderer.UPnP_RendererMain"/>
+  </Runtime>
+
+  <Register Location="/Models">
+    <!-- <Model Id="38D94506-7C7E-450B-AFDA-4ABE3548CAC3" ClassName="UPnPRenderer.Models.UPnPRendererModel"/> -->
+  </Register>
+
+  <Register Location="/VideoPlayers/MimeTypeRegistrations">
+    <VideoPlayerMimeTypeMapping Id="airplay" ClassName="MediaPortal.Extensions.UPnPRenderer.Players.UPnPRendererVideoPlayer" MimeType="video/airplayer"/>
+  </Register>
+
+  <Register Location="/Workflow/States">
+    <!-- This is the workflow state which corresponds to the hello world screen. Each workflow state corresponds to
+         a certain UI state. The id is needed to be able to reference the state, for example in the action which
+         navigates to this state, see in file hello-world-actions.xml.
+
+         The Id uniquely identifies the state among all workflow states. Use a GUID generator to create
+         a new state id. The id is referenced from workflow actions which lead to this state as well as from
+         code which tells the WorkflowManager to push a workflow state onto the workflow navigation stack.
+
+         The name of the state is only needed for debug reasons and will not be shown to the user.
+
+         The MainScreen will automatically be shown by the workflow manager when switching to the state.
+         It is also possible to set the screen programmatically when using a workflow model.
+
+         The DisplayLabel is the string which is shown in the Navigation bar for this state. -->
+    <WorkflowState Id="0E46763C-D225-4D29-A075-B9C6EB61897D"
+        Name="HelloWorldMain" MainScreen="hello_world"
+        DisplayLabel="UPnP Renderer"/> <!-- No workflow model -->
+  </Register>
+
+  <Register Location="/Resources/Skin">
+    <Resource Id="UPnPRendererSkin" Directory="Skin" Type="Skin"/>
+  </Register>
+
+  <Register Location="/Resources/Language">
+    <Resource Id="UPnPRendererLanguage" Directory="Language" Type="Language"/>
+  </Register>
+</Plugin>
