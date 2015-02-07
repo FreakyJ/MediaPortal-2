@@ -58,6 +58,7 @@
     <Reference Include="System.Core" />
     <Reference Include="System.Data" />
     <Reference Include="System.Drawing" />
+    <Reference Include="System.Web" />
     <Reference Include="System.Xml" />
     <Reference Include="System.Xml.Linq" />
   </ItemGroup>
@@ -81,6 +82,7 @@
     <Compile Include="UPnP\UPnPLightServer.cs" />
     <Compile Include="UPnP\UPnPRendererPlayer.cs" />
     <Compile Include="UPnP\UPnPRenderingControlServiceImpl.cs" />
+    <Compile Include="UPnP\utils.cs" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="plugin.xml">

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography.X509Certificates;
 using System.Timers;
 using MediaPortal.Common.MediaManagement.DefaultItemAspects;
 using MediaPortal.Extensions.UPnPRenderer.MediaItems;
@@ -16,14 +17,16 @@ using MediaPortal.UiComponents.Media.Models;
 using OnlineVideos;
 using OnlineVideos.MediaPortal2;
 using UPnP.Infrastructure.Dv.DeviceTree;
+using UPnPRenderer.UPnP;
 
 namespace MediaPortal.Extensions.UPnPRenderer
 {
   class Player
   {
+    private ContentType playerType = ContentType.Unknown;
+    
     // TODO remove
-    private static Timer time;
-    private static TimeSpan elapsedTime;
+    private static Timer _timer;
     
     public Player()
     {
@@ -32,43 +35,41 @@ namespace MediaPortal.Extensions.UPnPRenderer
       UPnPAVTransportServiceImpl.Stop += new StopEventHandler(Stop);
       UPnPAVTransportServiceImpl.SetAVTransportURI += new SetAVTransportURIEventHandler(SetAVTransportURI);
 
-      time = new Timer(1000);
+      _timer = new Timer(500);
     }
 
     private void Play(DvAction action)
     {
       Console.WriteLine("Event Fired! - Play -- " + action.Name);
-      UPnPAVTransportServiceImpl.ChangeStateVariable(action, "CurrentTrackDuration", "00:05:00");
 
-      stopPlayer<UPnPRendererVideoPlayer>();
-      PlayItemsModel.CheckQueryPlayAction(new VideoItem(action.ParentService.StateVariables["AVTransportURI"].Value.ToString()));
-      //startPlayback();
-
-      //UPnPRendererVideoPlayer player = getPlayer<UPnPRendererVideoPlayer>();
-      
-      //Utils.RemoveInvalidUrls(urls);
-      //if (urls != null && urls.Count > 0)
-      //{
-        // if there is already an OnlineVideo playing stop it first, 2 streams at the same time might saturate the connection or not be allowed by the server
-        /*var videoContexts = ServiceRegistration.Get<IPlayerContextManager>().GetPlayerContextsByAVType(AVType.Video);
-        var ovPlayerCtx = videoContexts.FirstOrDefault(vc => vc.CurrentPlayer is OnlineVideosPlayer);
-        if (ovPlayerCtx != null)
-          ovPlayerCtx.Stop();
-        VideoViewModel vmodel = new VideoViewModel("test", string.Empty);
-      vmodel.Description = "lol";
-      vmodel.Length = "00:05:00";*/
-        //MediaPortal.UiComponents.Media.Models.PlayItemsModel.CheckQueryPlayAction(new PlaylistItem(vmodel, action.ParentService.StateVariables["AVTransportURI"].Value.ToString()));
-      /*}
-      else
+      switch (playerType)
       {
-        // todo : show dialog that no valid urls were found
-      }*/
+        case ContentType.Audio:
+          break;
+        case ContentType.Image:
+          break;
+        case ContentType.Video:
+          //getPlayer<UPnPRendererVideoPlayer>().InitializePlayerEvents(PlaybackStarted, null, null, null, null, null);
+          stopPlayer<UPnPRendererVideoPlayer>();
+          PlayItemsModel.CheckQueryPlayAction(new VideoItem(action.ParentService.StateVariables["AVTransportURI"].Value.ToString()));
+          //Console.WriteLine("Duration: " + getPlayer<UPnPRendererVideoPlayer>().Duration.ToString());
+          //UPnPAVTransportServiceImpl.ChangeStateVariable(action, "CurrentTrackDuration", getPlayer<UPnPRendererVideoPlayer>().Duration.ToString());
+          break;
+        case ContentType.Unknown:
+          break;
+      }
+      
 
-      // TODO Dummy Impl
-      time = new Timer(1000);
-      time.Elapsed += (sender, e) => { _timer_Elapsed(action); };
-      time.Enabled = true;
-      time.AutoReset = true;
+      // TODO somehow I can't subscribe to events => use a timer as workaround
+      _timer = new Timer(500);
+      _timer.Elapsed += (sender, e) => _timer_Elapsed(action);
+      _timer.Enabled = true;
+      _timer.AutoReset = true;
+    }
+
+    public static void PlaybackStarted(IPlayer player)
+    {
+      Console.WriteLine("PlaybackStarted!!");
     }
 
     private void Stop(DvAction action)
@@ -76,11 +77,11 @@ namespace MediaPortal.Extensions.UPnPRenderer
       Console.WriteLine("Event Fired! - Stop -- " + action.Name);
 
       // TODO Dummy Impl
-      time.Enabled = false;
-      elapsedTime = TimeSpan.FromSeconds(0);
-      Console.WriteLine(elapsedTime.ToString());
-      UPnPAVTransportServiceImpl.ChangeStateVariable(action, "AbsoluteTimePosition", elapsedTime.ToString());
-      UPnPAVTransportServiceImpl.ChangeStateVariable(action, "RelativeTimePosition", elapsedTime.ToString());
+      _timer.Enabled = false;
+      string elapsedTime = TimeSpan.FromSeconds(0).ToString();
+      UPnPAVTransportServiceImpl.ChangeStateVariable(action, "TransportState", "STOPPED");
+      UPnPAVTransportServiceImpl.ChangeStateVariable(action, "AbsoluteTimePosition", elapsedTime);
+      UPnPAVTransportServiceImpl.ChangeStateVariable(action, "RelativeTimePosition", elapsedTime);
     }
 
     private void SetAVTransportURI(DvAction action, OnEventSetAVTransportURIEventArgs e)
@@ -88,16 +89,58 @@ namespace MediaPortal.Extensions.UPnPRenderer
       Console.WriteLine("Set Uri Event fired");
       Console.WriteLine("CurrentURI " + e.CurrentURI);
       Console.WriteLine("CurrentURIMetaData" + e.CurrentURIMetaData);
+
+      Console.WriteLine("MimeType: " + utils.GetMimeFromUrl(action.ParentService.StateVariables["AVTransportURI"].Value.ToString()));
+      playerType = utils.GetContentTypeFromUrl(action.ParentService.StateVariables["AVTransportURI"].Value.ToString());
+      //PlayItemsModel.PlayOrEnqueueItem(new VideoItem(action.ParentService.StateVariables["AVTransportURI"].Value.ToString()), false, PlayerContextConcurrencyMode.ConcurrentVideo);
+    }
+
+    private void SetDuration(DvAction action, string duration)
+    {
+      UPnPAVTransportServiceImpl.ChangeStateVariable(action, "CurrentTrackDuration", duration);
     }
 
     // TODO Dummy Implementation
 
-    static void _timer_Elapsed(DvAction action)
+    void _timer_Elapsed(DvAction action)
     {
-      elapsedTime = elapsedTime.Add(TimeSpan.FromSeconds(1));
-      Console.WriteLine(elapsedTime.ToString());
-      UPnPAVTransportServiceImpl.ChangeStateVariable(action, "AbsoluteTimePosition", elapsedTime.ToString());
-      UPnPAVTransportServiceImpl.ChangeStateVariable(action, "RelativeTimePosition", elapsedTime.ToString());
+      string elapsedTime = "00:00:00";
+      string duration = "00:00:00";
+
+      switch (playerType)
+      {
+        case ContentType.Audio:
+          break;
+        case ContentType.Image:
+          break;
+        case ContentType.Video:
+          var videoContexts = ServiceRegistration.Get<IPlayerContextManager>().GetPlayerContextsByAVType(AVType.Video);
+          var UPnPPlayerCtx = videoContexts.FirstOrDefault(vc => vc.CurrentPlayer is UPnPRendererVideoPlayer);
+          if (UPnPPlayerCtx != null)
+          {
+            if (getPlayer<UPnPRendererVideoPlayer>().State == PlayerState.Ended)
+            {
+              Console.WriteLine("Playback ended");
+              Stop(action);
+              return;
+            }
+            elapsedTime = getPlayer<UPnPRendererVideoPlayer>().CurrentTime.ToString(@"hh\:mm\:ss");
+            duration = getPlayer<UPnPRendererVideoPlayer>().Duration.ToString(@"hh\:mm\:ss");
+          }
+          else
+          {
+            Console.WriteLine("PlayerContext null");
+          }
+          ;
+          break;
+        case ContentType.Unknown:
+          break;
+      }
+      
+      // TODO build a function which takes a list => reduces events
+      UPnPAVTransportServiceImpl.ChangeStateVariable(action, "AbsoluteTimePosition", elapsedTime);
+      UPnPAVTransportServiceImpl.ChangeStateVariable(action, "RelativeTimePosition", elapsedTime);
+      UPnPAVTransportServiceImpl.ChangeStateVariable(action, "CurrentTrackDuration", duration);
     }
 
     #region Utils
