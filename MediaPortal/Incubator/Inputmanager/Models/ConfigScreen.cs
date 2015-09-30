@@ -20,7 +20,7 @@ using MediaPortal.UI.Presentation.Workflow;
 using MediaPortal.Utilities;
 using RawInput_dll;
 
-namespace MediaPortal.Plugins.Inputmanager.Models
+namespace MediaPortal.Plugins.InputdeviceManager.Models
 {
   public class ConfigScreen : IWorkflowModel
   {
@@ -29,20 +29,22 @@ namespace MediaPortal.Plugins.Inputmanager.Models
     protected AbstractProperty _inputDevicesProperty;
     protected AbstractProperty _addKeyLabelProperty;
     protected AbstractProperty _addKeyCountdownLabelProperty;
+    protected AbstractProperty _showInputDeviceSelectionProperty;
+    protected AbstractProperty _showKeyMappingProperty;
+    protected AbstractProperty _showAddKeyProperty;
+    protected AbstractProperty _showAddActionProperty;
     protected ItemsList _items;
     protected ItemsList _actionItems;
-    protected Inputmanager _inputmanagerInstance;
+    protected InputdeviceManager _inputmanagerInstance;
 
     private RawInput _rawinput;
-    private const bool CaptureOnlyInForeground = true;
-    private static IScreenControl screenControl;
     private static string _currentInputDevice;
     private static bool _inWorkflowKeyMapping = false;
     private static bool _inWorkflowAddKey = false;
     private static ConcurrentDictionary<string, int> _pressedKeys = new ConcurrentDictionary<string, int>();
     private static Dictionary<string, int> _pressedAddKeyCombo = new Dictionary<string, int>();
     private static int _maxPressedKeys = 0;
-    private static Timer _timer = new Timer(500);
+    private static readonly Timer _timer = new Timer(500);
     private DateTime _endTime;
     private Key _choosenAction;
 
@@ -84,20 +86,75 @@ namespace MediaPortal.Plugins.Inputmanager.Models
       get { return _actionItems; }
     }
 
+    public bool ShowInputDeviceSelection
+    {
+      get { return (bool)_showInputDeviceSelectionProperty.GetValue(); }
+      set { _showInputDeviceSelectionProperty.SetValue(value); }
+    }
+
+    public AbstractProperty ShowInputDeviceSelectionProperty
+    {
+      get { return _showInputDeviceSelectionProperty; }
+    }
+
+    public bool ShowKeyMapping
+    {
+      get { return (bool)_showKeyMappingProperty.GetValue(); }
+      set { _showKeyMappingProperty.SetValue(value); }
+    }
+
+    public AbstractProperty ShowKeyMappingProperty
+    {
+      get { return _showKeyMappingProperty; }
+    }
+
+    public bool ShowAddKey
+    {
+      get { return (bool)_showAddKeyProperty.GetValue(); }
+      set { _showAddKeyProperty.SetValue(value); }
+    }
+
+    public AbstractProperty ShowAddKeyProperty
+    {
+      get { return _showAddKeyProperty; }
+    }
+
+    public bool ShowAddAction
+    {
+      get { return (bool)_showAddActionProperty.GetValue(); }
+      set { _showAddActionProperty.SetValue(value); }
+    }
+
+    public AbstractProperty ShowAddActionProperty
+    {
+      get { return _showAddActionProperty; }
+    }
+
     private void InitModel()
     {
       _inputDevicesProperty = new WProperty(typeof(string), "TEST");
       _addKeyLabelProperty = new WProperty(typeof(string), "No Keys");
       _addKeyCountdownLabelProperty = new WProperty(typeof(string), "5");
+      _showInputDeviceSelectionProperty = new WProperty(typeof(bool), true);
+      _showKeyMappingProperty = new WProperty(typeof(bool), false);
+      _showAddKeyProperty = new WProperty(typeof(bool), false);
+      _showAddActionProperty = new WProperty(typeof(bool), false);
       _items = new ItemsList();
       _actionItems = new ItemsList();
 
-      foreach (var property in typeof(Key).GetFields())
+      foreach (var key in Key.NAME2SPECIALKEY)
+      {
+        var key1 = key;
+        var listItem = new ListItem(Consts.KEY_NAME, "Key:" + key.Key) { Command = new MethodDelegateCommand(() => ChooseKeyAction("Key:" + key1.Key)) };
+        _actionItems.Add(listItem);
+      }
+
+      /*foreach (var property in typeof(Key).GetFields())
       {
         var property1 = property;
         var listItem = new ListItem(Consts.KEY_NAME, "Key:" + property.Name) { Command = new MethodDelegateCommand(() => ChooseKeyAction("Key:" + property1.Name)) };
         _actionItems.Add(listItem);
-      }
+      }*/
 
       // TODO: Disable this for now
       /*IWorkflowManager workflowManager = ServiceRegistration.Get<IWorkflowManager>();
@@ -125,10 +182,8 @@ namespace MediaPortal.Plugins.Inputmanager.Models
         }
       }
 
-      screenControl = ServiceRegistration.Get<IScreenControl>();
-
-      _inputmanagerInstance = Inputmanager.Instance;
-      Inputmanager._rawinput.KeyPressed += OnKeyPressed;
+      _inputmanagerInstance = InputdeviceManager.Instance;
+      InputdeviceManager._rawinput.KeyPressed += OnKeyPressed;
     }
 
     protected List<ListItem> UpdateMenu(NavigationContext context)
@@ -184,7 +239,7 @@ namespace MediaPortal.Plugins.Inputmanager.Models
       }
 
 
-      if (_inWorkflowKeyMapping)
+      if (ShowKeyMapping || _inWorkflowAddKey)
       {
         if (_inWorkflowAddKey)
         {
@@ -231,7 +286,8 @@ namespace MediaPortal.Plugins.Inputmanager.Models
         _timer.Stop();
         _inWorkflowAddKey = false;
         ServiceRegistration.Get<ILogger>().Info("Next Screen!!!");
-        ServiceRegistration.Get<IWorkflowManager>().NavigatePush(Guid.Parse("FD7FEDE0-9268-41AE-AD0A-CC8066A41ED9"));
+        //ServiceRegistration.Get<IWorkflowManager>().NavigatePush(Guid.Parse("FD7FEDE0-9268-41AE-AD0A-CC8066A41ED9"));
+        ShowAddActionScreen();
       }
       else
       {
@@ -246,7 +302,7 @@ namespace MediaPortal.Plugins.Inputmanager.Models
     {
       _items.Clear();
       InputDevice device;
-      if (Inputmanager._inputDevices.TryGetValue(_currentInputDevice, out device))
+      if (InputdeviceManager._inputDevices.TryGetValue(_currentInputDevice, out device))
       {
         foreach (var keyMapping in device.KeyMap)
         {
@@ -256,8 +312,9 @@ namespace MediaPortal.Plugins.Inputmanager.Models
 
       _items.FireChange();
 
-      ServiceRegistration.Get<IWorkflowManager>().NavigatePush(Guid.Parse("6ABF367E-346B-459F-B5A6-B61A1E285A64"));
-      _inWorkflowKeyMapping = true;
+      //ServiceRegistration.Get<IWorkflowManager>().NavigatePush(Guid.Parse("6ABF367E-346B-459F-B5A6-B61A1E285A64"));
+      ShowKeyMappingScreen();
+      //_inWorkflowKeyMapping = true;
     }
 
     /// <summary>
@@ -272,25 +329,62 @@ namespace MediaPortal.Plugins.Inputmanager.Models
       _inWorkflowAddKey = false;
     }
 
-    private void ResetCompleteModel()
+    private void ResetCompleteModel(bool removeOnKeyPressed = true)
     {
       ResetAddKey();
-      _inWorkflowKeyMapping = false;
-      Inputmanager._rawinput.KeyPressed -= OnKeyPressed;
+      //_inWorkflowKeyMapping = false;
+
+      // Reset screens
+      ShowInputDeviceSelection = true;
+      ShowAddKey = false;
+      ShowAddAction = false;
+      ShowKeyMapping = false;
+      if (removeOnKeyPressed)
+        InputdeviceManager._rawinput.KeyPressed -= OnKeyPressed;
     }
+
+    #region Screen switching functions
+
+    private void ShowKeyMappingScreen()
+    {
+      ShowInputDeviceSelection = false;
+      ShowAddKey = false;
+      ShowAddAction = false;
+      ShowKeyMapping = true;
+    }
+
+    private void ShowAddKeyScreen()
+    {
+      ShowInputDeviceSelection = false;
+      ShowKeyMapping = false;
+      ShowAddAction = false;
+      ShowAddKey = true;
+    }
+
+    private void ShowAddActionScreen()
+    {
+      ShowInputDeviceSelection = false;
+      ShowKeyMapping = false;
+      ShowAddKey = false;
+      ShowAddAction = true;
+    }
+
+    #endregion Screen switching functions
 
     #region buttonActions
 
     public void AddKeyMapping()
     {
-      ServiceRegistration.Get<IWorkflowManager>().NavigatePush(Guid.Parse("9907E2BF-CCE9-4CF7-9F4D-807F14A5DF47"));
+      //ServiceRegistration.Get<IWorkflowManager>().NavigatePush(Guid.Parse("9907E2BF-CCE9-4CF7-9F4D-807F14A5DF47"));
+      ShowAddKeyScreen();
       _inWorkflowAddKey = true;
     }
 
     public void CancelMapping()
     {
-      ResetCompleteModel();
-      ServiceRegistration.Get<IScreenManager>().ShowScreen("configuration-section");
+      ResetCompleteModel(false);
+      //ServiceRegistration.Get<IScreenManager>().ShowScreen("configuration-section");
+      //ServiceRegistration.Get<IWorkflowManager>().NavigatePopModel(Guid.Parse("de84ff86-5ced-4416-8e69-7e8a604ad32c"));
       //ServiceRegistration.Get<IWorkflowManager>().NavigatePopModel(Guid.Parse("CB09DF01-65FA-4550-977C-B685C237ED3D"));
     }
 
@@ -350,7 +444,7 @@ namespace MediaPortal.Plugins.Inputmanager.Models
       settingsManager.Save(settings);
 
       // update settings in the main plugin
-      Inputmanager.Instance.UpdateLoadedSettings(settings);
+      InputdeviceManager.Instance.UpdateLoadedSettings(settings);
 
       ResetAddKey();
 

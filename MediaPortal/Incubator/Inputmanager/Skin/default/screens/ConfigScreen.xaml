@@ -7,9 +7,17 @@
   <Include.Resources>
         <ControlTemplate x:Key="Contents_Template">
             <DockPanel
-          Context="{Model Id=CC11183C-01A9-4F96-AF90-FAA046981006}" LastChildFill="False">
-            <Label Content="Bitte einen button auf dem zu configurierendem Gerät drücken." Color="{ThemeResource TextColor}" FontSize="36" DockPanel.Dock="Top" HorizontalAlignment="Center"/>
-        </DockPanel>
+          Context="{Model Id=CC11183C-01A9-4F96-AF90-FAA046981006}">
+                <!-- IsVisible Condition is defines inside the included files -->
+                <!-- Screen for selecting the input device -->
+                <Include Source="screens\ConfigScreenSelectDevice.inc"/>
+                <!-- Screen for adding/deleting actions -->
+                <Include Source="screens\ConfigScreenKeyMapping.inc"/>
+                <!-- Screen for adding a Key combination -->
+                <Include Source="screens\ConfigScreenAddKey.inc"/>
+                <!-- Screen for adding a Action to the Key combination -->
+                <Include Source="screens\ConfigScreenAddAction.inc"/>
+            </DockPanel>
         </ControlTemplate>
     </Include.Resources>
 </Include>

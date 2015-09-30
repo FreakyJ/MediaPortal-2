@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using MediaPortal.Common.Configuration.ConfigurationClasses;
 
-namespace MediaPortal.Plugins.Inputmanager.Settings
+namespace MediaPortal.Plugins.InputdeviceManager.Settings
 {
   public class ConfigScreen : CustomConfigSetting, IDisposable
   {

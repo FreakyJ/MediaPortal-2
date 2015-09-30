@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using MediaPortal.Common.Settings;
 
-namespace MediaPortal.Plugins.Inputmanager
+namespace MediaPortal.Plugins.InputdeviceManager
 {
   public class InputmanagerSettings
   {

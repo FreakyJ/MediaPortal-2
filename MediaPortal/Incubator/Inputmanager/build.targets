@@ -6,10 +6,16 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!--
-    <PluginFiles Include="$(TargetDir)$(ProjectName).dll" />-->
-    <PluginFiles Include="$(TargetDir)$(ProjectName).*" />
+    <PluginFiles Include="$(TargetDir)$(ProjectName).dll" />
     <PluginFiles Include="$(ProjectDir)plugin.xml" />
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(Configuration)' == 'Debug'">
+    <PluginFiles Include="$(TargetDir)$(ProjectName).pdb" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <LanguageFiles Include="$(ProjectDir)Language\*.*" />
   </ItemGroup>
 
   <ItemGroup>
@@ -18,6 +24,7 @@
 
   <Target Name="AfterBuild">
     <Copy SourceFiles="@(PluginFiles)" DestinationFolder="$(PluginDestination)" />
+    <Copy SourceFiles="@(LanguageFiles)" DestinationFolder="$(PluginDestination)Language\" />
     <Copy SourceFiles="@(SkinFiles)"
           DestinationFiles="@(SkinFiles->'$(PluginDestination)Skin\%(RecursiveDir)%(Filename)%(Extension)')" />
   </Target>

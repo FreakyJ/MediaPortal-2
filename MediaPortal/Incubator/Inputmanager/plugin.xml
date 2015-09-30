@@ -25,12 +25,16 @@
   </DependsOn>
 
   <Runtime>
-    <Assembly FileName="Inputmanager.dll"/>
-    <PluginStateTracker ClassName="MediaPortal.Plugins.Inputmanager.Inputmanager"/>
+    <Assembly FileName="InputdeviceManager.dll"/>
+    <PluginStateTracker ClassName="MediaPortal.Plugins.InputdeviceManager.InputdeviceManager"/>
   </Runtime>
 
+  <Register Location="/Resources/Language">
+    <Resource Id="InputdeviceManagerLanguage" Directory="Language" Type="Language"/>
+  </Register>
+
   <Register Location="/Models">
-    <Model Id="CC11183C-01A9-4F96-AF90-FAA046981006" Name="ServerImporterWorkerSetupModel" ClassName="MediaPortal.Plugins.Inputmanager.Models.ConfigScreen"/>
+    <Model Id="CC11183C-01A9-4F96-AF90-FAA046981006" Name="ServerImporterWorkerSetupModel" ClassName="MediaPortal.Plugins.InputdeviceManager.Models.ConfigScreen"/>
   </Register>
 
   <Register Location="/Resources/Skin">
@@ -39,11 +43,11 @@
 
   <Register Location="/Workflow/States">
     <WorkflowState Id="CB09DF01-65FA-4550-977C-B685C237ED3D"
-        Name="TEST"
+        Name="InputdeviceManagerConfigScreen"
         MainScreen="ConfigScreen"
         DisplayLabel="InputDevices"
         WorkflowModel="CC11183C-01A9-4F96-AF90-FAA046981006"/>
-    <WorkflowState Id="6ABF367E-346B-459F-B5A6-B61A1E285A64"
+    <!--<WorkflowState Id="6ABF367E-346B-459F-B5A6-B61A1E285A64"
         Name="changingInputsMain" MainScreen="ConfigScreenKeyMapping"
         DisplayLabel="changingInputsMain"/>
     <WorkflowState Id="9907E2BF-CCE9-4CF7-9F4D-807F14A5DF47"
@@ -51,15 +55,22 @@
         DisplayLabel="ConfigScreenAddKey"/>
     <WorkflowState Id="FD7FEDE0-9268-41AE-AD0A-CC8066A41ED9"
         Name="AddAction" MainScreen="ConfigScreenAddAction"
-        DisplayLabel="ConfigScreenAddAction"/>
+        DisplayLabel="ConfigScreenAddAction"/>-->
+  </Register>
+
+  <Register Location="/Configuration/Settings">
+    <ConfigSection
+        Id="InputDevices"
+        Redundant="true"
+        Text="[Settings.InputDeviceManager.Section]"/>
   </Register>
 
   <Register Location="/Configuration/Settings/InputDevices">
     <CustomConfigSetting
-        Id="InputDevices"
-        Text="InputDevices"
-        HelpText="Some help"
-        ClassName="MediaPortal.Plugins.Inputmanager.Settings.ConfigScreen"
+        Id="InputDevicesConf"
+        Text="[Settings.InputDeviceManager.EnterConfig]"
+        HelpText="[Settings.InputDeviceManager.EnterConfigHelp]"
+        ClassName="MediaPortal.Plugins.InputdeviceManager.Settings.ConfigScreen"
         AdditionalData="WorkflowState=CB09DF01-65FA-4550-977C-B685C237ED3D,ConfAppPanel=..."/>
   </Register>
 </Plugin>

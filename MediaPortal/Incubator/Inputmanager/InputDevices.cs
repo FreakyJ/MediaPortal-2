@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Xml.Serialization;
 
-namespace MediaPortal.Plugins.Inputmanager
+namespace MediaPortal.Plugins.InputdeviceManager
 {
   public class InputDevice
   {

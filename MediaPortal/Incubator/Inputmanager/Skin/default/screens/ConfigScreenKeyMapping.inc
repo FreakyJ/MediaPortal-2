@@ -1,12 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<Include
-    xmlns="www.team-mediaportal.com/2008/mpf/directx"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    Source="screens\master_menu.xaml"
-    >
-    <Include.Resources>
-        <ControlTemplate x:Key="Contents_Template">
-        <Grid>
+        <Grid IsVisible="{Binding ShowKeyMapping}"
+  xmlns="www.team-mediaportal.com/2008/mpf/directx"
+  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
             <!-- Model = MediaNavigationModel -->
             <Grid.Resources>
                 <Model x:Key="MediaModel" Id="CC11183C-01A9-4F96-AF90-FAA046981006"/>
@@ -32,17 +27,15 @@
                             <CommandBridge x:Key="Menu_Command" Command="{Binding Path=Command,Mode=OneTime}"/>
                         </ListView.Resources>
                     </ListView>
-                    <Button Context="{Model Id=CC11183C-01A9-4F96-AF90-FAA046981006}" Content="Add" Style="{ThemeResource ButtonWideStyle}" Margin="10"
+                    <Button Context="{Model Id=CC11183C-01A9-4F96-AF90-FAA046981006}" Content="[InputDeviceManager.KeyMapping.Button.Add]" Style="{ThemeResource ButtonWideStyle}" Margin="10"
               HorizontalAlignment="Right" VerticalAlignment="Center"
               Command="{Command AddKeyMapping}"/>
-                    <Button Context="{Model Id=CC11183C-01A9-4F96-AF90-FAA046981006}" Content="Cancel/Done" Style="{ThemeResource ButtonWideStyle}" Margin="10"
+                    <Button Context="{Model Id=CC11183C-01A9-4F96-AF90-FAA046981006}" Content="[InputDeviceManager.KeyMapping.Button.Cancel]" Style="{ThemeResource ButtonWideStyle}" Margin="10"
               HorizontalAlignment="Left" VerticalAlignment="Center"
               Command="{Command CancelMapping}"/>
                 </Grid>
         </Grid>
-        </ControlTemplate>
-    </Include.Resources>
-</Include>
+
 
 <!--
 

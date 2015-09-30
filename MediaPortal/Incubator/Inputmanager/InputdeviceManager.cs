@@ -14,11 +14,11 @@ using MediaPortal.UI.Presentation.Workflow;
 using MediaPortal.UI.SkinEngine.InputManagement;
 using RawInput_dll;
 
-namespace MediaPortal.Plugins.Inputmanager
+namespace MediaPortal.Plugins.InputdeviceManager
 {
-  public class Inputmanager : IPluginStateTracker
+  public class InputdeviceManager : IPluginStateTracker
   {
-    protected static Inputmanager _instance = null;
+    protected static InputdeviceManager _instance = null;
     public static RawInput _rawinput;
     private const bool CaptureOnlyInForeground = false;
     private ICollection<MappedKeyCode> _keyMap = new List<MappedKeyCode>();
@@ -27,12 +27,12 @@ namespace MediaPortal.Plugins.Inputmanager
     private static IScreenControl screenControl;
     private static ConcurrentDictionary<string, int> _pressedKeys = new ConcurrentDictionary<string, int>();
 
-    public Inputmanager()
+    public InputdeviceManager()
     {
       _instance = this;
     }
 
-    public static Inputmanager Instance
+    public static InputdeviceManager Instance
     {
       get
       {
