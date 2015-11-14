@@ -32,6 +32,7 @@ using MediaPortal.UiComponents.CECRemote.Settings;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Xml.Serialization;
 
@@ -111,11 +112,15 @@ namespace MediaPortal.UiComponents.CECRemote
 
     private void RemoteHandler(string remoteButton)
     {
+      ServiceRegistration.Get<ILogger>().Debug("RemoteHandler: remoteButton: {0}", remoteButton);
       DateTime current = DateTime.Now;
       TimeSpan span = current.Subtract(_keyTimeStamp);
 
-      if (span.TotalMilliseconds < 160 || _keyDown == false)
+      if ((span.TotalMilliseconds < 160 || _keyDown == false) && remoteButton != "Play" && remoteButton != "Stop")
+      {
+        ServiceRegistration.Get<ILogger>().Debug("CECRemotePlugin: Didn't made it: remoteButton: {0}, span: {1} ms, KeyDown: {2}", remoteButton, span.TotalMilliseconds, _keyDown);
         return;
+      }
 
       _keyTimeStamp = current;
 
@@ -129,7 +134,7 @@ namespace MediaPortal.UiComponents.CECRemote
           return;
         }
       }
-
+      
       Key key;
       if (_mappedKeyCodes.TryGetValue(remoteButton, out key))
       {
