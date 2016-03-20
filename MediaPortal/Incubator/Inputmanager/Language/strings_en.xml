@@ -8,6 +8,8 @@
 
   <string name="InputDeviceManager.AddKey.Header">Press the desired key combination on the inputdevice!</string>
 
-  <string name="InputDeviceManager.KeyMapping.Button.Add">Add</string>
-  <string name="InputDeviceManager.KeyMapping.Button.Cancel">Cancel/Done</string>
+  <string name="InputDeviceManager.KeyMapping.Button.AddMapping">Add mapping</string>
+  <string name="InputDeviceManager.KeyMapping.Button.Done">Done</string>
+
+  <string name="InputDeviceManager.KeyMapping.Dialog.RemoveMapping">Remove mapping?</string>
 </resources>

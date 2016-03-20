@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,6 +8,7 @@ using MediaPortal.Common.Commands;
 using MediaPortal.Common.General;
 using MediaPortal.Common.Localization;
 using MediaPortal.Common.Logging;
+using MediaPortal.Common.Messaging;
 using MediaPortal.Common.PluginManager;
 using MediaPortal.Common.Settings;
 using MediaPortal.UiComponents.SkinBase.General;
@@ -17,7 +17,6 @@ using MediaPortal.UI.Presentation.DataObjects;
 using MediaPortal.UI.Presentation.Models;
 using MediaPortal.UI.Presentation.Screens;
 using MediaPortal.UI.Presentation.Workflow;
-using MediaPortal.Utilities;
 using RawInput_dll;
 
 namespace MediaPortal.Plugins.InputdeviceManager.Models
@@ -25,6 +24,8 @@ namespace MediaPortal.Plugins.InputdeviceManager.Models
   public class ConfigScreen : IWorkflowModel
   {
     public const string INPUTDEVICES_ID_STR = "CC11183C-01A9-4F96-AF90-FAA046981006";
+    public const string RES_REMOVE_MAPPING_TEXT = "[InputDeviceManager.KeyMapping.Dialog.RemoveMapping]";
+    public const string KEY_KEYMAP = "KeyMapData";
 
     protected AbstractProperty _inputDevicesProperty;
     protected AbstractProperty _addKeyLabelProperty;
@@ -33,11 +34,12 @@ namespace MediaPortal.Plugins.InputdeviceManager.Models
     protected AbstractProperty _showKeyMappingProperty;
     protected AbstractProperty _showAddKeyProperty;
     protected AbstractProperty _showAddActionProperty;
+    protected AbstractProperty _selectedItemProperty;
     protected ItemsList _items;
     protected ItemsList _actionItems;
     protected InputdeviceManager _inputmanagerInstance;
 
-    private RawInput _rawinput;
+    //private RawInput _rawinput;
     private static string _currentInputDevice;
     private static bool _inWorkflowKeyMapping = false;
     private static bool _inWorkflowAddKey = false;
@@ -47,6 +49,8 @@ namespace MediaPortal.Plugins.InputdeviceManager.Models
     private static readonly Timer _timer = new Timer(500);
     private DateTime _endTime;
     private Key _choosenAction;
+
+    protected AsynchronousMessageQueue _messageQueue;
 
     public string AddKeyLabel
     {
@@ -130,6 +134,17 @@ namespace MediaPortal.Plugins.InputdeviceManager.Models
       get { return _showAddActionProperty; }
     }
 
+    public ListItem SelectedItem
+    {
+      get { return (ListItem)_selectedItemProperty.GetValue(); }
+      set { _selectedItemProperty.SetValue(value); }
+    }
+
+    public AbstractProperty SelectedItemProperty
+    {
+      get { return _selectedItemProperty; }
+    }
+
     private void InitModel()
     {
       _inputDevicesProperty = new WProperty(typeof(string), "TEST");
@@ -139,6 +154,7 @@ namespace MediaPortal.Plugins.InputdeviceManager.Models
       _showKeyMappingProperty = new WProperty(typeof(bool), false);
       _showAddKeyProperty = new WProperty(typeof(bool), false);
       _showAddActionProperty = new WProperty(typeof(bool), false);
+      _selectedItemProperty = new WProperty(typeof(ListItem), null);
       _items = new ItemsList();
       _actionItems = new ItemsList();
 
@@ -183,7 +199,10 @@ namespace MediaPortal.Plugins.InputdeviceManager.Models
       }
 
       _inputmanagerInstance = InputdeviceManager.Instance;
-      InputdeviceManager._rawinput.KeyPressed += OnKeyPressed;
+      InputdeviceManager.RawInput.KeyPressed += OnKeyPressed;
+
+      _messageQueue = new AsynchronousMessageQueue(this, new[] { DialogManagerMessaging.CHANNEL });
+      _messageQueue.MessageReceived += OnMessageReceived;
     }
 
     protected List<ListItem> UpdateMenu(NavigationContext context)
@@ -204,9 +223,9 @@ namespace MediaPortal.Plugins.InputdeviceManager.Models
         {
           ServiceRegistration.Get<ILogger>().Info(String.Join(" + ", string.Join(" + ", item.Labels.Select(kv => kv.Key.ToString() + "=" + kv.Value.ToString()).ToArray())));
           ServiceRegistration.Get<ILogger>().Info(item.Command.ToString());
-          IResourceString label;
+          //IResourceString label;
           //if (item.Labels.TryGetValue(Consts.KEY_NAME, out label))
-            //result.Add(new ListItem(Consts.KEY_NAME, label));
+          //result.Add(new ListItem(Consts.KEY_NAME, label));
         }
 
       var temp4 = (ICollection<WorkflowAction>)context.GetContextVariable(Consts.KEY_ITEM_ACTION, false);
@@ -230,6 +249,7 @@ namespace MediaPortal.Plugins.InputdeviceManager.Models
       switch (e.KeyPressEvent.Message)
       {
         case Win32.WM_KEYDOWN:
+        case Win32.WM_SYSKEYDOWN:
           _pressedKeys.GetOrAdd(e.KeyPressEvent.VKeyName, e.KeyPressEvent.VKey);
           break;
         case Win32.WM_KEYUP:
@@ -279,19 +299,28 @@ namespace MediaPortal.Plugins.InputdeviceManager.Models
 
     private void timer_Tick(object sender, EventArgs e)
     {
-      TimeSpan leftTime = _endTime.Subtract(DateTime.Now);
-      if (leftTime.TotalSeconds < 0)
+      try
       {
-        AddKeyCountdownLabel = "0";
-        _timer.Stop();
-        _inWorkflowAddKey = false;
-        ServiceRegistration.Get<ILogger>().Info("Next Screen!!!");
-        //ServiceRegistration.Get<IWorkflowManager>().NavigatePush(Guid.Parse("FD7FEDE0-9268-41AE-AD0A-CC8066A41ED9"));
-        ShowAddActionScreen();
+        TimeSpan leftTime = _endTime.Subtract(DateTime.Now);
+        if (leftTime.TotalSeconds < 0)
+        {
+          AddKeyCountdownLabel = "0";
+          _timer.Stop();
+          _inWorkflowAddKey = false;
+          var logger = ServiceRegistration.Get<ILogger>(false);
+          if (logger != null)
+            logger.Debug("Next Screen!!!");
+          //ServiceRegistration.Get<IWorkflowManager>().NavigatePush(Guid.Parse("FD7FEDE0-9268-41AE-AD0A-CC8066A41ED9"));
+          ShowAddActionScreen();
+        }
+        else
+        {
+          AddKeyCountdownLabel = leftTime.Seconds.ToString("0");
+        }
       }
-      else
+      catch
       {
-        AddKeyCountdownLabel = leftTime.Seconds.ToString("0");
+        // ignored
       }
     }
 
@@ -302,11 +331,16 @@ namespace MediaPortal.Plugins.InputdeviceManager.Models
     {
       _items.Clear();
       InputDevice device;
-      if (InputdeviceManager._inputDevices.TryGetValue(_currentInputDevice, out device))
+      if (InputdeviceManager.InputDevices.TryGetValue(_currentInputDevice, out device))
       {
         foreach (var keyMapping in device.KeyMap)
         {
-          _items.Add(new ListItem(Consts.KEY_NAME, String.Format("{0}: {1}", keyMapping.Key, String.Join(" + ", string.Join(" + ", keyMapping.Code.Select(KeyMapper.GetKeyName))))));
+          var item = new ListItem(Consts.KEY_NAME, String.Format("{0}: {1}", keyMapping.Key, String.Join(" + ", string.Join(" + ", keyMapping.Code.Select(KeyMapper.GetKeyName)))))
+          {
+            Command = new MethodDelegateCommand(MappingCommand)
+          };
+          item.AdditionalProperties.Add(KEY_KEYMAP, keyMapping);
+          _items.Add(item);
         }
       }
 
@@ -317,12 +351,94 @@ namespace MediaPortal.Plugins.InputdeviceManager.Models
       //_inWorkflowKeyMapping = true;
     }
 
+    private void MappingCommand()
+    {
+      if (SelectedItem != null)
+      {
+        _deleteMappingItem = SelectedItem;
+        var dialogManager = ServiceRegistration.Get<IDialogManager>();
+
+        _messageQueue.Start();
+
+        _deleteMappingDialogHandle = dialogManager.ShowDialog(SelectedItem.Label(Consts.KEY_NAME, SelectedItem.ToString()).ToString(),
+          LocalizationHelper.Translate(RES_REMOVE_MAPPING_TEXT), 
+          DialogType.YesNoDialog, false, DialogButtonType.No);
+      }
+    }
+
+    private Guid _deleteMappingDialogHandle = Guid.Empty;
+    private ListItem _deleteMappingItem;
+
+    private void OnMessageReceived(AsynchronousMessageQueue queue, SystemMessage message)
+    {
+      if (message.ChannelName == DialogManagerMessaging.CHANNEL)
+      {
+        DialogManagerMessaging.MessageType messageType = (DialogManagerMessaging.MessageType)message.MessageType;
+        if (messageType == DialogManagerMessaging.MessageType.DialogClosed)
+        {
+          Guid dialogHandle = (Guid)message.MessageData[DialogManagerMessaging.DIALOG_HANDLE];
+          if (_deleteMappingDialogHandle == dialogHandle)
+          {
+            DialogResult dialogResult = (DialogResult)message.MessageData[DialogManagerMessaging.DIALOG_RESULT];
+
+            if (dialogResult == DialogResult.Yes && _deleteMappingItem != null)
+            {
+              InputDevice device;
+              if (InputdeviceManager.InputDevices.TryGetValue(_currentInputDevice, out device))
+              {
+                MappedKeyCode mappedKeyCode = null;
+                foreach (var keyMapping in device.KeyMap)
+                {
+                  if (ReferenceEquals(keyMapping, _deleteMappingItem.AdditionalProperties[KEY_KEYMAP]))
+                  {
+                    mappedKeyCode = keyMapping;
+                  }
+                }
+                if (mappedKeyCode != null)
+                {
+                  device.KeyMap.Remove(mappedKeyCode);
+
+                  ISettingsManager settingsManager = ServiceRegistration.Get<ISettingsManager>();
+                  var settings = settingsManager.Load<InputmanagerSettings>();
+                  if (settings != null)
+                  {
+                    foreach (var inputDevice in settings.InputDevices)
+                    {
+                      if (inputDevice.DeviceID == _currentInputDevice)
+                      {
+                        inputDevice.KeyMap = device.KeyMap;
+
+                        settingsManager.Save(settings);
+
+                        // update settings in the main plugin
+                        InputdeviceManager.Instance.UpdateLoadedSettings(settings);
+
+                        // this brings us back to the add key menu
+                        UpdateKeymapping();
+
+                        break;
+                      }
+                    }
+                  }
+                }
+              }
+            }
+
+            _deleteMappingItem = null;
+            _deleteMappingDialogHandle = Guid.Empty;
+            _messageQueue.Shutdown();
+          }
+        }
+      }
+    }
+
     /// <summary>
     /// This function makes us ready to accept new key mappings
     /// </summary>
     private void ResetAddKey()
     {
       _maxPressedKeys = 0;
+      _pressedKeys.Clear();
       _pressedAddKeyCombo.Clear();
       AddKeyLabel = "";
       AddKeyCountdownLabel = "5";
@@ -340,7 +456,7 @@ namespace MediaPortal.Plugins.InputdeviceManager.Models
       ShowAddAction = false;
       ShowKeyMapping = false;
       if (removeOnKeyPressed)
-        InputdeviceManager._rawinput.KeyPressed -= OnKeyPressed;
+        InputdeviceManager.RawInput.KeyPressed -= OnKeyPressed;
     }
 
     #region Screen switching functions
@@ -376,6 +492,7 @@ namespace MediaPortal.Plugins.InputdeviceManager.Models
     public void AddKeyMapping()
     {
       //ServiceRegistration.Get<IWorkflowManager>().NavigatePush(Guid.Parse("9907E2BF-CCE9-4CF7-9F4D-807F14A5DF47"));
+      ResetAddKey();
       ShowAddKeyScreen();
       _inWorkflowAddKey = true;
     }
@@ -400,7 +517,7 @@ namespace MediaPortal.Plugins.InputdeviceManager.Models
 
       List<int> keys = _pressedAddKeyCombo.Select(key => key.Value).ToList();
 
-      
+
 
       ISettingsManager settingsManager = ServiceRegistration.Get<ISettingsManager>();
       InputmanagerSettings settings = settingsManager.Load<InputmanagerSettings>();
@@ -411,7 +528,8 @@ namespace MediaPortal.Plugins.InputdeviceManager.Models
         try
         {
           inputDevices = settings.InputDevices.ToList();
-        }catch{}
+        }
+        catch { }
 
       bool foundDevice = false;
       for (int i = 0; i < inputDevices.Count; i++)
@@ -429,7 +547,7 @@ namespace MediaPortal.Plugins.InputdeviceManager.Models
         {
           DeviceID = _currentInputDevice,
           Name = _currentInputDevice,
-          KeyMap = new List<MappedKeyCode>{new MappedKeyCode(choosenAction, keys)}
+          KeyMap = new List<MappedKeyCode> { new MappedKeyCode(choosenAction, keys) }
         };
         inputDevices.Add(inputDevice);
       }

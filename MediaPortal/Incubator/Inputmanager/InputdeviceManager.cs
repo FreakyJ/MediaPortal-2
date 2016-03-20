@@ -2,7 +2,6 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
-using System.Text;
 using System.Threading;
 using MediaPortal.Common;
 using MediaPortal.Common.Logging;
@@ -11,21 +10,20 @@ using MediaPortal.Common.Settings;
 using MediaPortal.UI.Control.InputManager;
 using MediaPortal.UI.Presentation.Screens;
 using MediaPortal.UI.Presentation.Workflow;
-using MediaPortal.UI.SkinEngine.InputManagement;
 using RawInput_dll;
 
 namespace MediaPortal.Plugins.InputdeviceManager
 {
   public class InputdeviceManager : IPluginStateTracker
   {
-    protected static InputdeviceManager _instance = null;
-    public static RawInput _rawinput;
-    private const bool CaptureOnlyInForeground = false;
-    private ICollection<MappedKeyCode> _keyMap = new List<MappedKeyCode>();
-    public static Dictionary<string, InputDevice> _inputDevices = new Dictionary<string, InputDevice>(); 
-    private Thread t;
-    private static IScreenControl screenControl;
-    private static ConcurrentDictionary<string, int> _pressedKeys = new ConcurrentDictionary<string, int>();
+    private static InputdeviceManager _instance;
+    private static RawInput _rawInput;
+    private const bool CAPTURE_ONLY_IN_FOREGROUND = false;
+    //private ICollection<MappedKeyCode> _keyMap = new List<MappedKeyCode>();
+    private static readonly Dictionary<string, InputDevice> _inputDevices = new Dictionary<string, InputDevice>();
+    private Thread _startupThread;
+    private static IScreenControl _screenControl;
+    private static readonly ConcurrentDictionary<string, int> _pressedKeys = new ConcurrentDictionary<string, int>();
 
     public InputdeviceManager()
     {
@@ -34,20 +32,28 @@ namespace MediaPortal.Plugins.InputdeviceManager
 
     public static InputdeviceManager Instance
     {
-      get
-      {
-        return _instance;
-      }
+      get { return _instance; }
+    }
+
+    public static RawInput RawInput
+    {
+      get { return _rawInput; }
+    }
+
+    public static IDictionary<string, InputDevice> InputDevices
+    {
+      get { return _inputDevices; }
     }
 
     private static void OnKeyPressed(object sender, RawInputEventArg e)
     {
-      ServiceRegistration.Get<ILogger>().Info("------");
+      ServiceRegistration.Get<ILogger>().Debug("------");
       try
       {
         switch (e.KeyPressEvent.Message)
         {
           case Win32.WM_KEYDOWN:
+          case Win32.WM_SYSKEYDOWN:
             _pressedKeys.GetOrAdd(e.KeyPressEvent.VKeyName, e.KeyPressEvent.VKey);
             break;
           case Win32.WM_KEYUP:
@@ -58,25 +64,28 @@ namespace MediaPortal.Plugins.InputdeviceManager
       }
       catch
       {
-        ServiceRegistration.Get<ILogger>().Info("stateNr {0}", e.KeyPressEvent.Message);
+        ServiceRegistration.Get<ILogger>().Debug("stateNr {0}", e.KeyPressEvent.Message);
       }
-      
+
       InputDevice device;
       if (_inputDevices.TryGetValue(e.KeyPressEvent.Source, out device))
       {
-        ServiceRegistration.Get<ILogger>().Info("Found input device!");
+        ServiceRegistration.Get<ILogger>().Debug("Found input device!");
         foreach (var keyMapping in device.KeyMap)
         {
           bool executeAction = true;
           foreach (var pressedKey in _pressedKeys)
             if (!keyMapping.Code.Contains(pressedKey.Value))
               executeAction = false;
-          if (executeAction && _pressedKeys.Count != 0)
+          if (executeAction && _pressedKeys.Count == keyMapping.Code.Count)
           {
             string[] actionArray = keyMapping.Key.Split(':');
-            ServiceRegistration.Get<ILogger>().Info("Execute action! Type: {0}, Parameter: {1}", actionArray[0], actionArray[1]);
+            ServiceRegistration.Get<ILogger>().Debug("Execute action! Type: {0}, Parameter: {1}", actionArray[0], actionArray[1]);
             if (actionArray[0] == "Key")
+            {
               ServiceRegistration.Get<IInputManager>().KeyPress(Key.GetSpecialKeyByName(actionArray[1]));
+              e.Handled = true;
+            }
             else if (actionArray[0] == "Menu")
             {
               //ServiceRegistration.Get<IWorkflowManager>().NavigatePush(Guid.Parse(actionArray[1]));
@@ -85,27 +94,26 @@ namespace MediaPortal.Plugins.InputdeviceManager
               {
                 ServiceRegistration.Get<ILogger>().Info("Found Action!");
                 action.Execute();
+                e.Handled = true;
               }
-
             }
-
           }
         }
       }
-      ServiceRegistration.Get<ILogger>().Info(e.KeyPressEvent.DeviceHandle.ToString());
-      //ServiceRegistration.Get<ILogger>().Info(e.KeyPressEvent.DeviceType);
-      //ServiceRegistration.Get<ILogger>().Info(e.KeyPressEvent.DeviceName);
-      ServiceRegistration.Get<ILogger>().Info(e.KeyPressEvent.Name);
-      ServiceRegistration.Get<ILogger>().Info(e.KeyPressEvent.VKey.ToString(CultureInfo.InvariantCulture));
-      //ServiceRegistration.Get<ILogger>().Info(_rawinput.NumberOfKeyboards.ToString(CultureInfo.InvariantCulture));
-      ServiceRegistration.Get<ILogger>().Info(e.KeyPressEvent.VKeyName);
-      ServiceRegistration.Get<ILogger>().Info(e.KeyPressEvent.Source);
-      ServiceRegistration.Get<ILogger>().Info(e.KeyPressEvent.KeyPressState);
-      //ServiceRegistration.Get<ILogger>().Info("0x{0:X4} ({0})", e.KeyPressEvent.Message);
+      ServiceRegistration.Get<ILogger>().Debug(e.KeyPressEvent.DeviceHandle.ToString());
+      //ServiceRegistration.Get<ILogger>().Debug(e.KeyPressEvent.DeviceType);
+      //ServiceRegistration.Get<ILogger>().Debug(e.KeyPressEvent.DeviceName);
+      ServiceRegistration.Get<ILogger>().Debug(e.KeyPressEvent.Name);
+      ServiceRegistration.Get<ILogger>().Debug(e.KeyPressEvent.VKey.ToString(CultureInfo.InvariantCulture));
+      //ServiceRegistration.Get<ILogger>().Debug(_rawinput.NumberOfKeyboards.ToString(CultureInfo.InvariantCulture));
+      ServiceRegistration.Get<ILogger>().Debug(e.KeyPressEvent.VKeyName);
+      ServiceRegistration.Get<ILogger>().Debug(e.KeyPressEvent.Source);
+      ServiceRegistration.Get<ILogger>().Debug(e.KeyPressEvent.KeyPressState);
+      //ServiceRegistration.Get<ILogger>().Debug("0x{0:X4} ({0})", e.KeyPressEvent.Message);
 
 
-      ServiceRegistration.Get<ILogger>().Info("All presses Keys: {0}", String.Join(" + ", _pressedKeys.ToArray()));
-      ServiceRegistration.Get<ILogger>().Info("------");
+      ServiceRegistration.Get<ILogger>().Debug("All presses Keys: {0}", String.Join(" + ", _pressedKeys.ToArray()));
+      ServiceRegistration.Get<ILogger>().Debug("------");
 
       /*ICollection<MappedKeyCode> keyCodes;
       if (_inputDevices.TryGetValue(e.KeyPressEvent.DeviceHandle.ToString(), out keyCodes))
@@ -131,22 +139,23 @@ namespace MediaPortal.Plugins.InputdeviceManager
 
     public static void ThreadProc()
     {
-      while (screenControl == null)
+      while (_screenControl == null)
       {
         try
         {
-          screenControl = ServiceRegistration.Get<IScreenControl>();
+          _screenControl = ServiceRegistration.Get<IScreenControl>();
 
-          _rawinput = new RawInput(screenControl.MainWindowHandle, CaptureOnlyInForeground);
-          _rawinput.AddMessageFilter(); // Adding a message filter will cause keypresses to be handled
-          _rawinput.KeyPressed += OnKeyPressed;
+          _rawInput = new RawInput(_screenControl.MainWindowHandle, CAPTURE_ONLY_IN_FOREGROUND);
+          _rawInput.AddMessageFilter(); // Adding a message filter will cause keypresses to be handled
+          _rawInput.KeyPressed += OnKeyPressed;
         }
         catch
         {
+          // ignored
         }
         Thread.Sleep(500);
       }
-      ServiceRegistration.Get<ILogger>().Info("Leave Thread!");
+      ServiceRegistration.Get<ILogger>().Debug("Leave Thread!");
     }
 
     public void LoadSettings()
@@ -170,7 +179,10 @@ namespace MediaPortal.Plugins.InputdeviceManager
           foreach (InputDevice device in settings.InputDevices)
             _inputDevices.Add(device.DeviceID, device);
         }
-        catch { }
+        catch
+        {
+          // ignored
+        }
     }
 
     #region Implementation of IPluginStateTracker
@@ -187,11 +199,8 @@ namespace MediaPortal.Plugins.InputdeviceManager
       //InputManager inputManager = InputManager.Instance;
       //inputManager.KeyPressed += HandleKeyPress;
 
-      
-
-      t = new Thread(ThreadProc);
-      t.Start();
-
+      _startupThread = new Thread(ThreadProc);
+      _startupThread.Start();
     }
 
     /// <summary>
